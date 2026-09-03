@@ -116,8 +116,8 @@ chrome.commands.onCommand.addListener(async (command, tab) => {
       direction
     );
     if (switcherState.presentation === "overlay") {
-      await renderOverlay();
-    } else {
+      await selectOverlay();
+    } else if (switcherState.presentation === "popup") {
       await chrome.runtime.sendMessage({ type: "cycle", direction }).catch(() => {});
     }
     return;
@@ -147,7 +147,7 @@ async function openSwitcher(activeTab, direction) {
   if (tabs.length < 2) return;
 
   const state = {
-    presentation: "overlay",
+    presentation: "opening",
     sourceTabId: activeTab.id,
     tabs,
     previews,
@@ -160,6 +160,7 @@ async function openSwitcher(activeTab, direction) {
       target: { tabId: activeTab.id },
       files: ["src/overlay.js"]
     });
+    state.presentation = "overlay";
     const capturedDataUrl = await capturePromise;
     if (switcherState !== state) return;
     await renderOverlay();
@@ -182,6 +183,8 @@ async function openSwitcher(activeTab, direction) {
 async function cacheCapturedPreview(state, tabId, capturedDataUrl) {
   try {
     const previewUrl = await downscalePreview(capturedDataUrl);
+    const liveTab = await chrome.tabs.get(tabId).catch(() => undefined);
+    if (!liveTab) return;
     const keepIds = state.tabs.map((tab) => tab.id);
     const previews = await updatePreviews((cache) => (
       updatePreviewCache(cache, tabId, previewUrl, keepIds)
@@ -216,6 +219,14 @@ async function renderOverlay() {
     type: "render-switcher",
     state: publicState()
   });
+}
+
+async function selectOverlay() {
+  if (!switcherState) return;
+  await chrome.tabs.sendMessage(switcherState.sourceTabId, {
+    type: "select-switcher",
+    selectedIndex: switcherState.selectedIndex
+  }).catch(() => {});
 }
 
 async function finishSwitcher(activate) {

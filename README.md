@@ -9,15 +9,18 @@ A local-first, Command-Tab-style switcher for Chrome tabs in most-recently-used 
 - Hold `Alt`, tap `Q` repeatedly to cycle, and release `Alt` to switch
 - `Alt+Shift+Q` cycles backward
 - `W` closes the highlighted tab and `Escape` cancels
-- A compact horizontal application-switcher overlay
+- A centered five-card switcher with real page previews
+- Five session-only 320×180 preview images, captured only when invoked
 - Optional cycling across all Chrome windows
 - No host permissions, network requests, analytics, or third-party dependencies
 - Event-driven background worker with no polling or permanent content scripts
-- In-memory MRU updates with collapsed session writes and seven-tile rendering
+- In-memory MRU updates with collapsed session writes and stable DOM rendering
 
 Chrome reserves Control-Tab, so a Web Store extension cannot replace that literal shortcut. On Ubuntu and Windows, this extension uses `Alt+Q` and `Alt+Shift+Q` to preserve the same press-and-hold interaction. Users can customize the commands at `chrome://extensions/shortcuts`.
 
 The shortcut temporarily injects an isolated overlay and one-shot key listener into the active page. The service worker owns the tab snapshot and selection; releasing `Alt` tells it to activate the selected tab, then the overlay removes itself. There are no permanent content scripts, host permissions, or polling. Chrome-owned pages that prohibit script injection use the toolbar popup fallback.
+
+Page previews populate progressively: each new switcher gesture captures only the currently visible outgoing tab, compresses it to a 320×180 JPEG, and retains at most five images in session storage. The cache disappears when Chrome exits. Tabs without a cached image use their favicon and title, and discarded tabs are never awakened to generate previews.
 
 ## Run locally
 
@@ -54,7 +57,8 @@ npm run package
 
 ```text
 manifest.json       Manifest V3 definition and shortcuts
-src/background.js   MRU tracking and cycle commands
+src/background.js   MRU tracking, capture lifecycle, and cycle commands
+src/preview.js      Bounded cache and worker image downscaling
 src/popup.*         Press-and-hold switcher overlay
 src/options.*       Settings and privacy disclosure
 src/core.js         Testable ordering and formatting logic

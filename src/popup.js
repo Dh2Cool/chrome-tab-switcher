@@ -1,6 +1,6 @@
 import { cycleSelection, fallbackLabel, initialSelection, rankTabs } from "./core.js";
 
-const MAX_VISIBLE_TABS = 7;
+const MAX_VISIBLE_TABS = 5;
 const RELEASE_FALLBACK_MS = 450;
 const list = document.querySelector("#tabs");
 const position = document.querySelector("#position");
