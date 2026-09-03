@@ -1,6 +1,7 @@
 import { cycleSelection, fallbackLabel, initialSelection, rankTabs } from "./core.js";
 
 const MAX_VISIBLE_TABS = 7;
+const RELEASE_FALLBACK_MS = 450;
 const list = document.querySelector("#tabs");
 const position = document.querySelector("#position");
 const selectedTitle = document.querySelector("#title");
@@ -9,6 +10,8 @@ let tabs = [];
 let selectedIndex = 0;
 let cancelled = false;
 let activating = false;
+let gestureMode = false;
+let commitTimer;
 
 async function load() {
   const [{ allWindows = false }, session] = await Promise.all([
@@ -19,9 +22,12 @@ async function load() {
   tabs = rankTabs(openTabs, session.mruTabIds ?? []);
 
   const request = session.cycleRequest;
-  const direction = request && Date.now() - request.requestedAt < 1500 ? request.direction : 1;
+  gestureMode = Boolean(request && Date.now() - request.requestedAt < 1500);
+  const direction = gestureMode ? request.direction : 1;
   selectedIndex = initialSelection(tabs.length, direction);
+  await chrome.storage.session.remove("cycleRequest");
   render();
+  scheduleCommit();
 }
 
 function visibleRange() {
@@ -90,11 +96,19 @@ function createTile(tab, index) {
 function cycle(direction) {
   selectedIndex = cycleSelection(selectedIndex, tabs.length, direction);
   render();
+  gestureMode = true;
+  scheduleCommit();
+}
+
+function scheduleCommit() {
+  clearTimeout(commitTimer);
+  if (gestureMode) commitTimer = setTimeout(activate, RELEASE_FALLBACK_MS);
 }
 
 async function activate(index = selectedIndex) {
   if (cancelled || activating || !tabs[index]) return;
   activating = true;
+  clearTimeout(commitTimer);
   const tab = tabs[index];
   await chrome.windows.update(tab.windowId, { focused: true });
   await chrome.tabs.update(tab.id, { active: true });
@@ -108,7 +122,10 @@ async function closeSelected() {
   tabs.splice(selectedIndex, 1);
   selectedIndex = Math.min(selectedIndex, Math.max(tabs.length - 1, 0));
   if (!tabs.length) window.close();
-  else render();
+  else {
+    render();
+    scheduleCommit();
+  }
 }
 
 chrome.runtime.onMessage.addListener((message) => {
@@ -122,6 +139,7 @@ document.addEventListener("keyup", (event) => {
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     cancelled = true;
+    clearTimeout(commitTimer);
     window.close();
   } else if (event.key.toLocaleLowerCase() === "w" || event.key === "Delete") {
     event.preventDefault();

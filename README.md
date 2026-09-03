@@ -17,6 +17,8 @@ A local-first, Command-Tab-style switcher for Chrome tabs in most-recently-used 
 
 Chrome reserves Control-Tab, so a Web Store extension cannot replace that literal shortcut. On Ubuntu and Windows, this extension uses `Alt+Q` and `Alt+Shift+Q` to preserve the same press-and-hold interaction. Users can customize the commands at `chrome://extensions/shortcuts`.
 
+Chrome can open an action popup after the initiating modifier release has already been dispatched. The extension commits immediately when it receives the `Alt` release and otherwise uses a short, resettable fallback after the last cycle input. This avoids persistent listeners, page access, and polling.
+
 ## Run locally
 
 1. Open `chrome://extensions`.
