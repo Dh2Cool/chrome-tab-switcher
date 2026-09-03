@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Recent Tabs Switcher settings</title>
+    <link rel="stylesheet" href="options.css">
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow">RECENT TABS SWITCHER</p>
+      <h1>Settings</h1>
+      <p class="lede">A small, local-first switcher for people who keep more tabs than they intended.</p>
+      <section>
+        <label class="setting">
+          <span><strong>Search every Chrome window</strong><small>When off, the popup shows only the current window.</small></span>
+          <input id="all-windows" type="checkbox">
+        </label>
+      </section>
+      <section>
+        <h2>Keyboard shortcuts</h2>
+        <p>On Ubuntu, hold Alt and tap Q to cycle forward. Add Shift to cycle backward, then release Alt to switch. Chrome controls extension shortcuts, so you can remap both commands.</p>
+        <button id="shortcuts">Open Chrome shortcut settings</button>
+      </section>
+      <section>
+        <h2>Privacy</h2>
+        <p>Tab IDs are kept in Chrome’s temporary session storage solely to order your tabs. Settings remain on this device. Nothing is transmitted, sold, or used for advertising or analytics.</p>
+      </section>
+      <p id="saved" role="status"></p>
+    </main>
+    <script type="module" src="options.js"></script>
+  </body>
+</html>

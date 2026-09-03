@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Recent Tabs</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main>
+      <header>
+        <span>Recent Tabs</span>
+        <span id="position" aria-live="polite"></span>
+      </header>
+      <ol id="tabs" class="tabs" role="listbox" aria-label="Recent tabs"></ol>
+      <div id="title" class="selected-title"></div>
+      <footer>
+        <span>Hold <kbd>Alt</kbd> · tap <kbd>Q</kbd></span>
+        <span><kbd>Shift</kbd> reverse</span>
+        <span><kbd>W</kbd> close</span>
+        <span><kbd>Esc</kbd> cancel</span>
+      </footer>
+    </main>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

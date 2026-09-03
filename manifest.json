@@ -1,0 +1,48 @@
+{
+  "manifest_version": 3,
+  "name": "Recent Tabs Switcher",
+  "version": "0.2.0",
+  "description": "Cycle through Chrome tabs in most-recently-used order.",
+  "minimum_chrome_version": "127",
+  "permissions": ["storage", "tabs"],
+  "background": {
+    "service_worker": "src/background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Recent Tabs Switcher",
+    "default_popup": "src/popup.html",
+    "default_icon": {
+      "16": "assets/icon-16.png",
+      "32": "assets/icon-32.png",
+      "48": "assets/icon-48.png",
+      "128": "assets/icon-128.png"
+    }
+  },
+  "icons": {
+    "16": "assets/icon-16.png",
+    "32": "assets/icon-32.png",
+    "48": "assets/icon-48.png",
+    "128": "assets/icon-128.png"
+  },
+  "commands": {
+    "cycle-forward": {
+      "suggested_key": {
+        "default": "Alt+Q",
+        "mac": "Command+Shift+Space"
+      },
+      "description": "Open the switcher or cycle forward"
+    },
+    "cycle-backward": {
+      "suggested_key": {
+        "default": "Alt+Shift+Q",
+        "mac": "Command+Shift+Comma"
+      },
+      "description": "Open the switcher or cycle backward"
+    }
+  },
+  "options_ui": {
+    "page": "src/options.html",
+    "open_in_tab": true
+  }
+}

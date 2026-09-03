@@ -1,0 +1,92 @@
+:root {
+  color-scheme: light dark;
+  font: 13px/1.35 Inter, ui-sans-serif, system-ui, sans-serif;
+  --panel: rgb(244 242 238 / 96%);
+  --text: #26231f;
+  --muted: #716c63;
+  --tile: rgb(255 255 255 / 52%);
+  --selected: #6756e8;
+  --ring: #a99cff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --panel: rgb(35 34 31 / 97%);
+    --text: #f6f3eb;
+    --muted: #aaa59b;
+    --tile: rgb(255 255 255 / 6%);
+    --selected: #7665ed;
+    --ring: #b5aaff;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  width: 760px;
+  margin: 0;
+  overflow: hidden;
+  background: transparent;
+  color: var(--text);
+  user-select: none;
+}
+
+main {
+  padding: 15px 16px 11px;
+  background: var(--panel);
+}
+
+header,
+footer {
+  display: flex;
+  align-items: center;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+header { justify-content: space-between; padding: 0 3px 10px; font-weight: 700; }
+
+.tabs {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 9px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tab {
+  display: grid;
+  min-width: 0;
+  height: 106px;
+  place-items: center;
+  padding: 10px 7px 7px;
+  border: 2px solid transparent;
+  border-radius: 14px;
+  background: var(--tile);
+  cursor: pointer;
+}
+
+.tab.selected {
+  border-color: var(--ring);
+  background: var(--selected);
+  color: white;
+  box-shadow: 0 8px 22px rgb(36 26 91 / 28%);
+}
+
+.favicon,
+.fallback { width: 48px; height: 48px; }
+.favicon { object-fit: contain; }
+.fallback { display: grid; place-items: center; border-radius: 12px; background: #fff; color: #6756e8; font-size: 22px; font-weight: 800; }
+.label { width: 100%; overflow: hidden; text-align: center; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 650; }
+.selected-title { height: 35px; overflow: hidden; padding: 10px 8px 7px; text-align: center; text-overflow: ellipsis; white-space: nowrap; font-weight: 650; }
+
+footer {
+  justify-content: center;
+  gap: 18px;
+  padding-top: 9px;
+  border-top: 1px solid rgb(128 128 128 / 18%);
+}
+
+kbd { padding: 1px 5px; border: 1px solid rgb(128 128 128 / 35%); border-radius: 5px; font: 10px ui-monospace, monospace; }
+.empty { grid-column: 1 / -1; padding: 34px; color: var(--muted); text-align: center; }
