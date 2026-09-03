@@ -1,10 +1,10 @@
 import {
   cycleSelection,
-  initialSelection,
   limitTabs,
   normalizeMru,
   rankTabs,
-  recordActivation
+  recordActivation,
+  selectionFromDirections
 } from "./core.js";
 import {
   downscalePreview,
@@ -36,13 +36,13 @@ async function readMru() {
 }
 
 function updateMru(transform) {
-  updateQueue = updateQueue.then(async () => {
+  updateQueue = updateQueue.catch(() => {}).then(async () => {
     mruIds = transform(await readMru());
     // Collapse bursts of activation events into one tiny session write. There
     // is no polling: Chrome can suspend this worker whenever it is idle.
     clearTimeout(pendingWrite);
     pendingWrite = setTimeout(() => {
-      chrome.storage.session.set({ [MRU_KEY]: mruIds });
+      chrome.storage.session.set({ [MRU_KEY]: mruIds }).catch(() => {});
     }, 150);
   });
   return updateQueue;
@@ -61,7 +61,7 @@ async function readPreviews() {
 }
 
 function updatePreviews(transform) {
-  previewQueue = previewQueue.then(async () => {
+  previewQueue = previewQueue.catch(() => {}).then(async () => {
     const previous = await readPreviews();
     const next = transform(previous);
     if (next === previous) return previous;
@@ -110,6 +110,13 @@ chrome.commands.onCommand.addListener(async (command, tab) => {
 
   const direction = command === "cycle-backward" ? -1 : 1;
   if (switcherState) {
+    if (
+      switcherState.presentation === "preparing" ||
+      switcherState.presentation === "popup-opening"
+    ) {
+      switcherState.directions.push(direction);
+      return;
+    }
     switcherState.selectedIndex = cycleSelection(
       switcherState.selectedIndex,
       switcherState.tabs.length,
@@ -127,56 +134,97 @@ chrome.commands.onCommand.addListener(async (command, tab) => {
 });
 
 async function openSwitcher(activeTab, direction) {
-  if (!activeTab?.id) {
-    [activeTab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-  }
-  if (!activeTab?.id) return;
-
-  const capturePromise = chrome.tabs.captureVisibleTab(activeTab.windowId, {
-    format: "jpeg",
-    quality: 45
-  }).catch(() => undefined);
-
-  await updateQueue;
-  const [{ allWindows = false }, previews] = await Promise.all([
-    chrome.storage.local.get("allWindows"),
-    readPreviews()
-  ]);
-  const openTabs = await chrome.tabs.query(allWindows ? {} : { windowId: activeTab.windowId });
-  const tabs = limitTabs(rankTabs(openTabs, await readMru()), MAX_PREVIEWS);
-  if (tabs.length < 2) return;
-
   const state = {
-    presentation: "opening",
-    sourceTabId: activeTab.id,
-    tabs,
-    previews,
-    selectedIndex: initialSelection(tabs.length, direction)
+    presentation: "preparing",
+    directions: [direction],
+    releaseRequested: false,
+    cancelRequested: false
   };
   switcherState = state;
 
   try {
-    await chrome.scripting.executeScript({
-      target: { tabId: activeTab.id },
-      files: ["src/overlay.js"]
-    });
-    state.presentation = "overlay";
-    const capturedDataUrl = await capturePromise;
-    if (switcherState !== state) return;
-    await renderOverlay();
-
-    if (capturedDataUrl) {
-      await cacheCapturedPreview(state, activeTab.id, capturedDataUrl);
+    if (!activeTab?.id) {
+      [activeTab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
     }
-  } catch {
+    if (!activeTab?.id || switcherState !== state) {
+      if (switcherState === state) switcherState = undefined;
+      return;
+    }
+    state.sourceTabId = activeTab.id;
+
+    let overlayInjected = false;
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId: activeTab.id },
+        files: ["src/overlay.js"]
+      });
+      overlayInjected = true;
+    } catch {
+      // Restricted Chrome pages use the toolbar popup fallback.
+    }
+
+    const capturePromise = overlayInjected
+      ? chrome.tabs.captureVisibleTab(activeTab.windowId, {
+          format: "jpeg",
+          quality: 45
+        }).catch(() => undefined)
+      : Promise.resolve(undefined);
+
+    await updateQueue;
+    const [{ allWindows = false }, previews] = await Promise.all([
+      chrome.storage.local.get("allWindows"),
+      readPreviews()
+    ]);
+    const openTabs = await chrome.tabs.query(allWindows ? {} : { windowId: activeTab.windowId });
+    const tabs = limitTabs(rankTabs(openTabs, await readMru()), MAX_PREVIEWS);
+
     if (switcherState !== state) return;
-    switcherState.presentation = "popup";
+    if (tabs.length < 2) {
+      switcherState = undefined;
+      if (overlayInjected) {
+        await chrome.tabs.sendMessage(activeTab.id, { type: "close-switcher" }).catch(() => {});
+      }
+      return;
+    }
+
+    state.tabs = tabs;
+    state.previews = previews;
+    state.selectedIndex = selectionFromDirections(tabs.length, state.directions);
+    if (state.cancelRequested || state.releaseRequested) {
+      await finishSwitcher(!state.cancelRequested);
+      const capturedDataUrl = await capturePromise;
+      if (capturedDataUrl) await cacheCapturedPreview(state, activeTab.id, capturedDataUrl);
+      return;
+    }
+
+    if (overlayInjected) {
+      state.presentation = "overlay-opening";
+      const capturedDataUrl = await capturePromise;
+      if (switcherState !== state) {
+        if (capturedDataUrl) await cacheCapturedPreview(state, activeTab.id, capturedDataUrl);
+        return;
+      }
+      state.presentation = "overlay";
+      await renderOverlay();
+
+      if (capturedDataUrl) {
+        await cacheCapturedPreview(state, activeTab.id, capturedDataUrl);
+      }
+      return;
+    }
+
+    state.presentation = "popup-opening";
     await chrome.storage.session.set({
-      cycleRequest: { direction, requestedAt: Date.now() }
+      cycleRequest: { directions: [...state.directions], requestedAt: Date.now() }
     });
     await chrome.action.openPopup(
       activeTab.windowId ? { windowId: activeTab.windowId } : undefined
     );
+  } catch {
+    if (switcherState === state) switcherState = undefined;
+    if (state.sourceTabId) {
+      await chrome.tabs.sendMessage(state.sourceTabId, { type: "close-switcher" }).catch(() => {});
+    }
   }
 }
 
@@ -229,6 +277,18 @@ async function selectOverlay() {
   }).catch(() => {});
 }
 
+async function syncPopup() {
+  const state = switcherState;
+  if (state?.presentation !== "popup-opening") return;
+
+  state.selectedIndex = selectionFromDirections(state.tabs.length, state.directions);
+  state.presentation = "popup";
+  await chrome.runtime.sendMessage({
+    type: "sync-selection",
+    selectedIndex: state.selectedIndex
+  }).catch(() => {});
+}
+
 async function finishSwitcher(activate) {
   const state = switcherState;
   switcherState = undefined;
@@ -244,10 +304,23 @@ async function finishSwitcher(activate) {
 }
 
 chrome.runtime.onMessage.addListener((message) => {
-  if (message.type === "modifier-released") return finishSwitcher(true);
-  if (message.type === "cancel-switcher") return finishSwitcher(false);
+  if (message.type === "popup-ready") return syncPopup();
+  if (message.type === "modifier-released") {
+    if (switcherState?.presentation === "preparing") {
+      switcherState.releaseRequested = true;
+      return undefined;
+    }
+    return finishSwitcher(true);
+  }
+  if (message.type === "cancel-switcher") {
+    if (switcherState?.presentation === "preparing") {
+      switcherState.cancelRequested = true;
+      return undefined;
+    }
+    return finishSwitcher(false);
+  }
   if (message.type === "close-selected-tab") {
-    if (!switcherState) return undefined;
+    if (!switcherState?.tabs) return undefined;
     const selected = switcherState.tabs[switcherState.selectedIndex];
     if (selected.id === switcherState.sourceTabId) {
       switcherState = undefined;

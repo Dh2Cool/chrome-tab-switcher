@@ -1,4 +1,10 @@
-import { cycleSelection, fallbackLabel, initialSelection, rankTabs } from "./core.js";
+import {
+  cycleSelection,
+  fallbackLabel,
+  limitTabs,
+  rankTabs,
+  selectionFromDirections
+} from "./core.js";
 
 const MAX_VISIBLE_TABS = 5;
 const RELEASE_FALLBACK_MS = 450;
@@ -19,15 +25,16 @@ async function load() {
     chrome.storage.session.get(["mruTabIds", "cycleRequest"])
   ]);
   const openTabs = await chrome.tabs.query(allWindows ? {} : { currentWindow: true });
-  tabs = rankTabs(openTabs, session.mruTabIds ?? []);
+  tabs = limitTabs(rankTabs(openTabs, session.mruTabIds ?? []), MAX_VISIBLE_TABS);
 
   const request = session.cycleRequest;
   gestureMode = Boolean(request && Date.now() - request.requestedAt < 1500);
-  const direction = gestureMode ? request.direction : 1;
-  selectedIndex = initialSelection(tabs.length, direction);
+  const directions = gestureMode ? request.directions ?? [request.direction] : [1];
+  selectedIndex = selectionFromDirections(tabs.length, directions);
   await chrome.storage.session.remove("cycleRequest");
   render();
   scheduleCommit();
+  await chrome.runtime.sendMessage({ type: "popup-ready" });
 }
 
 function visibleRange() {
@@ -132,6 +139,11 @@ async function closeSelected() {
 
 chrome.runtime.onMessage.addListener((message) => {
   if (message.type === "cycle") cycle(message.direction);
+  if (message.type === "sync-selection") {
+    selectedIndex = message.selectedIndex;
+    render();
+    scheduleCommit();
+  }
 });
 
 document.addEventListener("keyup", (event) => {

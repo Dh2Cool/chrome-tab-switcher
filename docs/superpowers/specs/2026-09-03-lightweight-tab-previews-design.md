@@ -14,6 +14,7 @@ Add Arc-style visual previews to the existing press-and-hold MRU switcher while 
 - Keep the panel centered at exactly 50% of the page viewport.
 - Repeated shortcut presses update only the selected card and title.
 - Releasing Alt closes immediately and activates the selected tab without a closing animation.
+- If Chrome finishes injection after every relevant keyup has already occurred, a 700 ms one-shot fallback commits the selection so the switcher cannot remain stuck.
 
 ## Capture and cache architecture
 
@@ -34,7 +35,8 @@ The injected root remains `position: fixed; inset: 0`, while the panel uses `top
 ## Permissions and performance constraints
 
 - Keep the existing `activeTab`, `scripting`, `storage`, and `tabs` permissions.
-- Add no host permissions, persistent content scripts, timers, polling, analytics, or dependencies.
+- Add no host permissions, persistent content scripts, background timers, polling, analytics, or dependencies.
+- Permit one 700 ms release-fallback timer only while the overlay is visible.
 - Capture at most once per switcher session.
 - Store at most five 320 by 180 compressed previews.
 - Limit the rendered switcher set to five tabs.

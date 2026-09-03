@@ -8,7 +8,8 @@ import {
   limitTabs,
   normalizeMru,
   rankTabs,
-  recordActivation
+  recordActivation,
+  selectionFromDirections
 } from "../src/core.js";
 
 test("normalizes stale and duplicate MRU entries", () => {
@@ -24,6 +25,9 @@ test("starts on the previous tab and cycles in either direction", () => {
   assert.equal(initialSelection(5, -1), 4);
   assert.equal(cycleSelection(4, 5, 1), 0);
   assert.equal(cycleSelection(0, 5, -1), 4);
+  assert.equal(selectionFromDirections(5, [1, 1]), 2);
+  assert.equal(selectionFromDirections(5, [1, -1]), 0);
+  assert.equal(selectionFromDirections(5, [-1, -1]), 3);
 });
 
 test("ranks tabs by MRU and filters title or URL", () => {

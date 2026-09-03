@@ -13,7 +13,8 @@
 ## Global Constraints
 
 - Keep only the existing `activeTab`, `scripting`, `storage`, and `tabs` permissions.
-- Add no dependencies, host permissions, persistent content scripts, timers, polling, or analytics.
+- Add no dependencies, host permissions, persistent content scripts, background timers, polling, or analytics.
+- Use one 700 ms release-fallback timer only while the overlay is visible.
 - Capture at most once per switcher session and retain at most five 320 by 180 JPEG previews.
 - Preview failures must never block tab switching.
 

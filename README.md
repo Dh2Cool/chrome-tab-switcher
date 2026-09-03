@@ -20,6 +20,8 @@ Chrome reserves Control-Tab, so a Web Store extension cannot replace that litera
 
 The shortcut temporarily injects an isolated overlay and one-shot key listener into the active page. The service worker owns the tab snapshot and selection; releasing `Alt` tells it to activate the selected tab, then the overlay removes itself. There are no permanent content scripts, host permissions, or polling. Chrome-owned pages that prohibit script injection use the toolbar popup fallback.
 
+Chrome does not expose global modifier-key state to extensions. Normal Alt releases commit immediately; a 700 ms one-shot fallback runs only while the overlay is visible so an unusually fast release during script injection cannot leave it stuck.
+
 Page previews populate progressively: each new switcher gesture captures only the currently visible outgoing tab, compresses it to a 320×180 JPEG, and retains at most five images in session storage. The cache disappears when Chrome exits. Tabs without a cached image use their favicon and title, and discarded tabs are never awakened to generate previews.
 
 ## Run locally

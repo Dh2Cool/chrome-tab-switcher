@@ -2,6 +2,7 @@
   if (globalThis.recentTabsOverlay) return;
 
   const MAX_VISIBLE_TABS = 5;
+  const RELEASE_FALLBACK_MS = 700;
   const host = document.createElement("div");
   const shadow = host.attachShadow({ mode: "closed" });
   host.style.cssText = "all:initial;position:fixed;inset:0;z-index:2147483647;pointer-events:none";
@@ -46,6 +47,8 @@
 
   const cardSlots = Array.from({ length: MAX_VISIBLE_TABS }, createCard);
   let renderedTabs = [];
+  let releaseTimer;
+  let finishing = false;
   for (const slot of cardSlots) tabs.append(slot.element);
   panel.append(tabs, title, hint);
   shadow.append(style, panel);
@@ -138,6 +141,7 @@
 
     select(state.selectedIndex);
     panel.hidden = false;
+    armReleaseFallback();
   }
 
   function select(selectedIndex) {
@@ -147,9 +151,23 @@
       cardSlots[index].element.setAttribute("aria-selected", String(selected));
     }
     title.textContent = renderedTabs[selectedIndex]?.title || "";
+    if (!panel.hidden) armReleaseFallback();
+  }
+
+  function armReleaseFallback() {
+    clearTimeout(releaseTimer);
+    releaseTimer = setTimeout(commitSelection, RELEASE_FALLBACK_MS);
+  }
+
+  function commitSelection() {
+    if (finishing) return;
+    finishing = true;
+    clearTimeout(releaseTimer);
+    chrome.runtime.sendMessage({ type: "modifier-released" });
   }
 
   function close() {
+    clearTimeout(releaseTimer);
     document.removeEventListener("keyup", onKeyUp, true);
     document.removeEventListener("keydown", onKeyDown, true);
     chrome.runtime.onMessage.removeListener(onMessage);
@@ -158,7 +176,8 @@
   }
 
   function onKeyUp(event) {
-    if (event.key === "Alt") chrome.runtime.sendMessage({ type: "modifier-released" });
+    const altAlreadyReleased = event.key.toLocaleLowerCase() === "q" && !event.altKey;
+    if (event.key === "Alt" || altAlreadyReleased) commitSelection();
   }
 
   function onKeyDown(event) {

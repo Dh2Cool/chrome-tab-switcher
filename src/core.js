@@ -27,6 +27,15 @@ export function cycleSelection(index, tabCount, direction) {
   return (index + direction + tabCount) % tabCount;
 }
 
+export function selectionFromDirections(tabCount, directions) {
+  if (!directions.length) return 0;
+  let selectedIndex = initialSelection(tabCount, directions[0]);
+  for (const direction of directions.slice(1)) {
+    selectedIndex = cycleSelection(selectedIndex, tabCount, direction);
+  }
+  return selectedIndex;
+}
+
 export function limitTabs(tabs, maximum) {
   return tabs.slice(0, Math.max(0, maximum));
 }
