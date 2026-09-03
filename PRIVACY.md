@@ -17,6 +17,8 @@ The use of information received from Chrome APIs adheres to the Chrome Web Store
 ## Permissions
 
 - `tabs`: required to list open tabs and their titles, URLs, and favicons, and to activate or close the tab the user selects.
+- `activeTab`: grants temporary access to the current page only when the user invokes the switcher shortcut.
+- `scripting`: injects the temporary switcher overlay and modifier-release listener into that active page; it is removed as soon as the gesture ends.
 - `storage`: required to keep temporary most-recently-used ordering and the user's all-windows preference.
 
 ## Contact

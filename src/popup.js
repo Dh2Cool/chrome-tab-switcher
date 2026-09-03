@@ -110,9 +110,11 @@ async function activate(index = selectedIndex) {
   activating = true;
   clearTimeout(commitTimer);
   const tab = tabs[index];
-  await chrome.windows.update(tab.windowId, { focused: true });
-  await chrome.tabs.update(tab.id, { active: true });
-  window.close();
+  await chrome.runtime.sendMessage({
+    type: "activate-tab",
+    tabId: tab.id,
+    windowId: tab.windowId
+  });
 }
 
 async function closeSelected() {
@@ -154,10 +156,6 @@ document.addEventListener("keydown", (event) => {
     event.preventDefault();
     activate();
   }
-});
-
-window.addEventListener("blur", () => {
-  if (!cancelled && !activating) activate();
 });
 
 load();

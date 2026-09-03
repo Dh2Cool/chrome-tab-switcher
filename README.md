@@ -12,12 +12,12 @@ A local-first, Command-Tab-style switcher for Chrome tabs in most-recently-used 
 - A compact horizontal application-switcher overlay
 - Optional cycling across all Chrome windows
 - No host permissions, network requests, analytics, or third-party dependencies
-- Event-driven background worker with no polling or content scripts
+- Event-driven background worker with no polling or permanent content scripts
 - In-memory MRU updates with collapsed session writes and seven-tile rendering
 
 Chrome reserves Control-Tab, so a Web Store extension cannot replace that literal shortcut. On Ubuntu and Windows, this extension uses `Alt+Q` and `Alt+Shift+Q` to preserve the same press-and-hold interaction. Users can customize the commands at `chrome://extensions/shortcuts`.
 
-Chrome can open an action popup after the initiating modifier release has already been dispatched. The extension commits immediately when it receives the `Alt` release and otherwise uses a short, resettable fallback after the last cycle input. This avoids persistent listeners, page access, and polling.
+The shortcut temporarily injects an isolated overlay and one-shot key listener into the active page. The service worker owns the tab snapshot and selection; releasing `Alt` tells it to activate the selected tab, then the overlay removes itself. There are no permanent content scripts, host permissions, or polling. Chrome-owned pages that prohibit script injection use the toolbar popup fallback.
 
 ## Run locally
 

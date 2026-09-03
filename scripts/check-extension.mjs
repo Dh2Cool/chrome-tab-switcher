@@ -5,6 +5,7 @@ const paths = [
   manifest.background.service_worker,
   manifest.action.default_popup,
   manifest.options_ui.page,
+  "src/overlay.js",
   ...Object.values(manifest.icons),
   ...Object.values(manifest.action.default_icon)
 ];
