@@ -1,16 +1,27 @@
 import {
   cycleSelection,
   initialSelection,
+  limitTabs,
   normalizeMru,
   rankTabs,
   recordActivation
 } from "./core.js";
+import {
+  downscalePreview,
+  MAX_PREVIEWS,
+  removePreview,
+  updatePreviewCache
+} from "./preview.js";
 
 const MRU_KEY = "mruTabIds";
+const PREVIEW_KEY = "tabPreviews";
 let mruIds;
 let readPromise;
 let pendingWrite;
 let updateQueue = Promise.resolve();
+let previewCache;
+let previewReadPromise;
+let previewQueue = Promise.resolve();
 let switcherState;
 
 async function readMru() {
@@ -37,6 +48,30 @@ function updateMru(transform) {
   return updateQueue;
 }
 
+async function readPreviews() {
+  if (!previewCache) {
+    previewReadPromise ??= chrome.storage.session.get(PREVIEW_KEY).then((result) => {
+      const stored = result[PREVIEW_KEY];
+      previewCache = stored && typeof stored === "object" ? stored : {};
+      return previewCache;
+    });
+    await previewReadPromise;
+  }
+  return previewCache;
+}
+
+function updatePreviews(transform) {
+  previewQueue = previewQueue.then(async () => {
+    const previous = await readPreviews();
+    const next = transform(previous);
+    if (next === previous) return previous;
+    previewCache = next;
+    await chrome.storage.session.set({ [PREVIEW_KEY]: previewCache });
+    return previewCache;
+  });
+  return previewQueue;
+}
+
 async function reconcile() {
   const tabs = await chrome.tabs.query({});
   const liveIds = tabs.map((tab) => tab.id).filter(Number.isInteger);
@@ -57,10 +92,17 @@ chrome.tabs.onActivated.addListener(({ tabId }) => {
 
 chrome.tabs.onRemoved.addListener((tabId) => {
   updateMru((ids) => ids.filter((id) => id !== tabId));
+  updatePreviews((cache) => tabId in cache ? removePreview(cache, tabId) : cache);
 });
 
 chrome.tabs.onReplaced.addListener((addedTabId, removedTabId) => {
   updateMru((ids) => recordActivation(ids.filter((id) => id !== removedTabId), addedTabId));
+  updatePreviews((cache) => {
+    const preview = cache[removedTabId];
+    if (!preview) return cache;
+    const next = removePreview(cache, removedTabId);
+    return { ...next, [addedTabId]: preview };
+  });
 });
 
 chrome.commands.onCommand.addListener(async (command, tab) => {
@@ -90,26 +132,43 @@ async function openSwitcher(activeTab, direction) {
   }
   if (!activeTab?.id) return;
 
+  const capturePromise = chrome.tabs.captureVisibleTab(activeTab.windowId, {
+    format: "jpeg",
+    quality: 45
+  }).catch(() => undefined);
+
   await updateQueue;
-  const { allWindows = false } = await chrome.storage.local.get("allWindows");
+  const [{ allWindows = false }, previews] = await Promise.all([
+    chrome.storage.local.get("allWindows"),
+    readPreviews()
+  ]);
   const openTabs = await chrome.tabs.query(allWindows ? {} : { windowId: activeTab.windowId });
-  const tabs = rankTabs(openTabs, await readMru());
+  const tabs = limitTabs(rankTabs(openTabs, await readMru()), MAX_PREVIEWS);
   if (tabs.length < 2) return;
 
-  switcherState = {
+  const state = {
     presentation: "overlay",
     sourceTabId: activeTab.id,
     tabs,
+    previews,
     selectedIndex: initialSelection(tabs.length, direction)
   };
+  switcherState = state;
 
   try {
     await chrome.scripting.executeScript({
       target: { tabId: activeTab.id },
       files: ["src/overlay.js"]
     });
+    const capturedDataUrl = await capturePromise;
+    if (switcherState !== state) return;
     await renderOverlay();
+
+    if (capturedDataUrl) {
+      await cacheCapturedPreview(state, activeTab.id, capturedDataUrl);
+    }
   } catch {
+    if (switcherState !== state) return;
     switcherState.presentation = "popup";
     await chrome.storage.session.set({
       cycleRequest: { direction, requestedAt: Date.now() }
@@ -117,6 +176,23 @@ async function openSwitcher(activeTab, direction) {
     await chrome.action.openPopup(
       activeTab.windowId ? { windowId: activeTab.windowId } : undefined
     );
+  }
+}
+
+async function cacheCapturedPreview(state, tabId, capturedDataUrl) {
+  try {
+    const previewUrl = await downscalePreview(capturedDataUrl);
+    const keepIds = state.tabs.map((tab) => tab.id);
+    const previews = await updatePreviews((cache) => (
+      updatePreviewCache(cache, tabId, previewUrl, keepIds)
+    ));
+
+    if (switcherState === state) {
+      state.previews = previews;
+      await renderOverlay();
+    }
+  } catch {
+    // Previews are optional; capture failures must not affect tab switching.
   }
 }
 
@@ -128,7 +204,8 @@ function publicState() {
       id,
       title,
       url,
-      favIconUrl
+      favIconUrl,
+      previewUrl: switcherState.previews[id]
     }))
   };
 }
