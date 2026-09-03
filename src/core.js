@@ -27,6 +27,10 @@ export function cycleSelection(index, tabCount, direction) {
   return (index + direction + tabCount) % tabCount;
 }
 
+export function limitTabs(tabs, maximum) {
+  return tabs.slice(0, Math.max(0, maximum));
+}
+
 export function rankTabs(tabs, mruIds, query = "") {
   const order = new Map(mruIds.map((id, index) => [id, index]));
   const needle = query.trim().toLocaleLowerCase();

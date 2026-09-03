@@ -5,6 +5,7 @@ import {
   displayUrl,
   fallbackLabel,
   initialSelection,
+  limitTabs,
   normalizeMru,
   rankTabs,
   recordActivation
@@ -37,4 +38,10 @@ test("ranks tabs by MRU and filters title or URL", () => {
 test("formats URLs and fallback labels", () => {
   assert.equal(displayUrl("https://example.com/path"), "example.com/path");
   assert.equal(fallbackLabel("  zebra"), "Z");
+});
+
+test("limits the switcher to the most recent tabs", () => {
+  const tabs = [{ id: 1 }, { id: 2 }, { id: 3 }];
+  assert.deepEqual(limitTabs(tabs, 2), [{ id: 1 }, { id: 2 }]);
+  assert.deepEqual(limitTabs(tabs, 0), []);
 });
